@@ -12,16 +12,12 @@
     <div class="login-card">
       <img src="assets/logo.png" alt="" style="height:32px; margin-bottom:14px;" />
       <h1>Gestão de Mídias Sociais</h1>
-      <p>Entre com seu e-mail e senha cadastrados.</p>
+      <p>Digite a senha de acesso da equipe.</p>
 
       <form id="form-login">
         <div class="field">
-          <label for="email">E-mail</label>
-          <input type="email" id="email" required autocomplete="email" />
-        </div>
-        <div class="field">
-          <label for="senha">Senha</label>
-          <input type="password" id="senha" required autocomplete="current-password" />
+          <label for="senha">Senha de acesso</label>
+          <input type="password" id="senha" required autocomplete="current-password" autofocus />
         </div>
         <button type="submit" class="btn btn-primary" style="width:100%;" id="btn-entrar">Entrar</button>
         <p class="form-msg" id="msg"></p>
@@ -29,39 +25,33 @@
     </div>
   </div>
 
-  <script src="js/vendor/supabase.js"></script>
   <script src="js/config.js"></script>
-  <script src="js/supabaseClient.js"></script>
   <script>
-    document.getElementById("form-login").addEventListener("submit", async (e) => {
+    // já entrou antes neste navegador? pula direto pro painel
+    if (localStorage.getItem("equipe_autenticada") === "1") {
+      window.location.href = "dashboard.html";
+    }
+
+    document.getElementById("form-login").addEventListener("submit", (e) => {
       e.preventDefault();
-      const email = document.getElementById("email").value.trim();
       const senha = document.getElementById("senha").value;
       const msg = document.getElementById("msg");
-      const btn = document.getElementById("btn-entrar");
-      msg.textContent = "";
-      msg.className = "form-msg";
-      btn.disabled = true;
-      btn.textContent = "Entrando...";
 
-      const { error } = await window.supabaseClient.auth.signInWithPassword({ email, password: senha });
-
-      btn.disabled = false;
-      btn.textContent = "Entrar";
-
-      if (error) {
-        msg.textContent = "Não foi possível entrar: " + error.message;
+      if (!window.APP_CONFIG || !window.APP_CONFIG.TEAM_PASSWORD) {
+        msg.textContent = "Senha de acesso não configurada. Confira js/config.js.";
         msg.className = "form-msg error";
         return;
       }
+
+      if (senha !== window.APP_CONFIG.TEAM_PASSWORD) {
+        msg.textContent = "Senha incorreta.";
+        msg.className = "form-msg error";
+        return;
+      }
+
+      localStorage.setItem("equipe_autenticada", "1");
       window.location.href = "dashboard.html";
     });
-
-    // se já estiver logado, pula direto pro dashboard
-    (async () => {
-      const { data: { session } } = await window.supabaseClient.auth.getSession();
-      if (session) window.location.href = "dashboard.html";
-    })();
   </script>
 </body>
 </html>

@@ -503,18 +503,25 @@ a { color: inherit; }
 }
 .demanda-controls {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   margin-top: 8px;
 }
 .demanda-controls select {
   font: inherit;
-  font-size: 12px;
-  padding: 5px 8px;
+  font-size: 11px;
+  padding: 5px 6px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-hairline);
   background: var(--surface-1);
   color: var(--text-primary);
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+.demanda-controls button {
+  flex-shrink: 0;
 }
 
 .pill {

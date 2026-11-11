@@ -20,13 +20,12 @@ const NOME_STATUS = {
 };
 
 let estado = {
-  session: null,
-  profile: null,
   clientId: null,
   clients: [],
   cliente: null,
   weeks: [],
   demandas: [],
+  colaboradores: [],
   weekTabSelecionada: null, // id da semana, ou "pacote"
 };
 
@@ -76,13 +75,15 @@ async function carregarTudo() {
     return;
   }
 
-  const [{ data: clients }, { data: cliente }] = await Promise.all([
+  const [{ data: clients }, { data: cliente }, { data: colaboradores }] = await Promise.all([
     window.supabaseClient.from("clients").select("*").eq("ativo", true).order("nome"),
     window.supabaseClient.from("clients").select("*").eq("id", estado.clientId).single(),
+    window.supabaseClient.from("colaboradores").select("*").eq("ativo", true).order("nome"),
   ]);
 
   estado.clients = clients || [];
   estado.cliente = cliente;
+  estado.colaboradores = colaboradores || [];
 
   if (!cliente) {
     document.getElementById("client-title").textContent = "Cliente não encontrado";
@@ -230,7 +231,6 @@ function renderWeekBanner() {
 
   banner.style.display = "flex";
 
-  const podeValidar = estado.profile && estado.profile.role === "validador";
   const textos = {
     disponivel: "Semana liberada para adiantar o preenchimento. Ainda não entra na apresentação de sexta.",
     aguardando_validacao: "Semana pronta para ser apresentada e validada na sexta-feira.",
@@ -240,7 +240,7 @@ function renderWeekBanner() {
 
   let botao = "";
   if (semana.status === "aguardando_validacao") {
-    botao = `<button class="btn btn-primary" id="btn-validar-semana" ${podeValidar ? "" : "disabled"}>Validar semana</button>`;
+    botao = `<button class="btn btn-primary" id="btn-validar-semana">Validar semana</button>`;
   }
 
   banner.innerHTML = `<span>${textos[semana.status] || ""}</span>${botao}`;
@@ -343,9 +343,16 @@ function renderBlockCard({ bloco, titulo, weekId, itens }) {
             </select>
           </div>
           <div class="field">
-            <label>Link (arte pronta no CRM)</label>
-            <input type="url" class="input-link" placeholder="https://..." />
+            <label>Responsável</label>
+            <select class="input-responsavel">
+              <option value="">Sem responsável definido</option>
+              ${estado.colaboradores.map((c) => `<option value="${c.id}">${escapeHtml(c.nome)}${c.funcao ? ` (${escapeHtml(c.funcao)})` : ""}</option>`).join("")}
+            </select>
           </div>
+        </div>
+        <div class="field">
+          <label>Link (arte pronta no CRM)</label>
+          <input type="url" class="input-link" placeholder="https://..." />
         </div>
         ${
           isPacote
@@ -363,7 +370,6 @@ function renderBlockCard({ bloco, titulo, weekId, itens }) {
 }
 
 function renderDemandaItem(item) {
-  const podeValidar = estado.profile && estado.profile.role === "validador";
   const metaBits = [];
   if (item.tipo_publicacao === "manual") metaBits.push("Manual");
   if (item.data_publicacao) metaBits.push(formatarDataCurta(item.data_publicacao) + (item.hora_publicacao ? " " + item.hora_publicacao.slice(0, 5) : ""));
@@ -381,10 +387,13 @@ function renderDemandaItem(item) {
       <div class="demanda-controls">
         <select class="select-status" data-id="${item.id}">
           ${Object.entries(NOME_STATUS)
-            .map(
-              ([valor, nome]) =>
-                `<option value="${valor}" ${valor === item.status ? "selected" : ""} ${valor === "validada" && !podeValidar ? "disabled" : ""}>${nome}</option>`
-            )
+            .map(([valor, nome]) => `<option value="${valor}" ${valor === item.status ? "selected" : ""}>${nome}</option>`)
+            .join("")}
+        </select>
+        <select class="select-responsavel" data-id="${item.id}" title="Responsável">
+          <option value="">Responsável</option>
+          ${estado.colaboradores
+            .map((c) => `<option value="${c.id}" ${c.id === item.responsavel_id ? "selected" : ""}>${escapeHtml(c.nome)}</option>`)
             .join("")}
         </select>
         <button class="btn btn-ghost" data-acao="excluir-tarefa" data-id="${item.id}" style="margin-left:auto;">Excluir</button>
@@ -418,6 +427,10 @@ function ligarEventosDoGrid() {
     sel.addEventListener("change", () => atualizarStatus(sel.dataset.id, sel.value));
   });
 
+  grid.querySelectorAll(".select-responsavel").forEach((sel) => {
+    sel.addEventListener("change", () => atualizarResponsavel(sel.dataset.id, sel.value || null));
+  });
+
   grid.querySelectorAll('[data-acao="excluir-tarefa"]').forEach((btn) => {
     btn.addEventListener("click", () => excluirTarefa(btn.dataset.id));
   });
@@ -438,6 +451,7 @@ async function salvarTarefa(bloco, weekId) {
     titulo,
     descricao: form.querySelector(".input-descricao").value.trim() || null,
     tipo_publicacao: form.querySelector(".input-tipo").value,
+    responsavel_id: form.querySelector(".input-responsavel").value || null,
     link: form.querySelector(".input-link").value.trim() || null,
     status: "pendente",
   };
@@ -472,6 +486,15 @@ async function atualizarStatus(id, novoStatus) {
   renderWeekTabs();
 }
 
+async function atualizarResponsavel(id, responsavelId) {
+  const { error } = await window.supabaseClient.from("demandas").update({ responsavel_id: responsavelId }).eq("id", id);
+  if (error) {
+    mostrarToast("Erro: " + error.message);
+  }
+  await carregarSemanasEDemandas();
+  renderWeekTabs();
+}
+
 async function excluirTarefa(id) {
   if (!confirm("Excluir esta tarefa?")) return;
   const { error } = await window.supabaseClient.from("demandas").delete().eq("id", id);
@@ -486,10 +509,7 @@ async function excluirTarefa(id) {
 // ------------------------------------------------------------------
 
 async function init() {
-  const auth = await mountUserTag("user-tag");
-  if (!auth) return;
-  estado.session = auth.session;
-  estado.profile = auth.profile;
+  if (!montarTopbarAcoes("user-tag")) return;
   await carregarTudo();
 }
 
