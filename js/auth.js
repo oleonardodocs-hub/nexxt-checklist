@@ -1,45 +1,37 @@
-// Funções compartilhadas de autenticação e papel do usuário.
+// Controle de acesso simples: sem login individual, só uma senha única da
+// equipe (ver index.html). Guarda uma flag no navegador depois que a senha
+// é confirmada uma vez.
 
-async function requireSession() {
-  const { data: { session } } = await window.supabaseClient.auth.getSession();
-  if (!session) {
+function temAcessoLiberado() {
+  return localStorage.getItem("equipe_autenticada") === "1";
+}
+
+function exigirAcesso() {
+  if (!temAcessoLiberado()) {
     window.location.href = "index.html";
-    return null;
+    return false;
   }
-  return session;
+  return true;
 }
 
-async function getProfile(userId) {
-  const { data, error } = await window.supabaseClient
-    .from("profiles")
-    .select("id, nome, role")
-    .eq("id", userId)
-    .single();
-  if (error) {
-    console.error("Erro ao buscar profile:", error);
-    return null;
-  }
-  return data;
-}
-
-async function logout() {
-  await window.supabaseClient.auth.signOut();
+function sair() {
+  localStorage.removeItem("equipe_autenticada");
   window.location.href = "index.html";
 }
 
-// Preenche a tag de usuário (nome + papel) presente em quase toda página.
-async function mountUserTag(elId) {
-  const session = await requireSession();
-  if (!session) return null;
-  const profile = await getProfile(session.user.id);
+// Preenche a área de ações no topo (botão de sair + link para a equipe).
+// Retorna false se o acesso não estiver liberado (a página já foi
+// redirecionada para o login nesse caso).
+function montarTopbarAcoes(elId) {
+  if (!exigirAcesso()) return false;
+
   const el = document.getElementById(elId);
-  if (el && profile) {
+  if (el) {
     el.innerHTML = `
-      ${profile.nome}
-      <span class="badge-role">${profile.role === "validador" ? "Validador" : "Editor"}</span>
+      <a class="btn btn-ghost" href="colaboradores.html" style="padding:4px 10px;">Equipe</a>
       <button class="btn btn-ghost" id="btn-logout" style="padding:4px 10px;">Sair</button>
     `;
-    document.getElementById("btn-logout").addEventListener("click", logout);
+    document.getElementById("btn-logout").addEventListener("click", sair);
   }
-  return { session, profile };
+  return true;
 }

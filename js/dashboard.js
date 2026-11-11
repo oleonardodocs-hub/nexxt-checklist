@@ -53,9 +53,16 @@ function capitalizarPrimeira(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
-function renderSaudacaoEData(nome) {
+function saudacaoPorHorario() {
+  const h = new Date().getHours();
+  if (h < 12) return "Bom dia";
+  if (h < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
+function renderSaudacaoEData() {
   const hoje = new Date();
-  document.getElementById("saudacao").textContent = `Olá, ${nome}`;
+  document.getElementById("saudacao").textContent = saudacaoPorHorario();
   document.getElementById("data-hoje").textContent = capitalizarPrimeira(
     new Intl.DateTimeFormat("pt-BR", {
       weekday: "long",
@@ -90,29 +97,37 @@ function renderCalendario() {
 }
 
 async function carregarDados() {
-  const [{ data: clients, error: errClients }, { data: weeks, error: errWeeks }, { data: demandas, error: errDemandas }] =
-    await Promise.all([
-      window.supabaseClient.from("clients").select("*").eq("ativo", true).order("nome"),
-      window.supabaseClient.from("weeks").select("*"),
-      window.supabaseClient.from("demandas").select("*"),
-    ]);
+  const [
+    { data: clients, error: errClients },
+    { data: weeks, error: errWeeks },
+    { data: demandas, error: errDemandas },
+    { data: colaboradores, error: errColaboradores },
+  ] = await Promise.all([
+    window.supabaseClient.from("clients").select("*").eq("ativo", true).order("nome"),
+    window.supabaseClient.from("weeks").select("*"),
+    window.supabaseClient.from("demandas").select("*"),
+    window.supabaseClient.from("colaboradores").select("*").eq("ativo", true),
+  ]);
 
-  if (errClients || errWeeks || errDemandas) {
-    console.error(errClients || errWeeks || errDemandas);
+  if (errClients || errWeeks || errDemandas || errColaboradores) {
+    console.error(errClients || errWeeks || errDemandas || errColaboradores);
     document.getElementById("client-grid").innerHTML =
       '<div class="empty-state">Não foi possível carregar os dados. Confira js/config.js e o schema do Supabase.</div>';
     return;
   }
 
-  renderClientes(clients || [], weeks || [], demandas || []);
+  const colaboradoresPorId = {};
+  (colaboradores || []).forEach((c) => (colaboradoresPorId[c.id] = c.nome));
+
+  renderClientes(clients || [], weeks || [], demandas || [], colaboradoresPorId);
 }
 
-function renderClientes(clients, weeks, demandas) {
+function renderClientes(clients, weeks, demandas, colaboradoresPorId) {
   const grid = document.getElementById("client-grid");
 
   if (clients.length === 0) {
     grid.innerHTML = '<div class="empty-state">Nenhum cliente cadastrado ainda. Use o botão "+ Novo cliente" abaixo.</div>';
-    renderChecklistHoje([]);
+    renderChecklistHoje([], null, colaboradoresPorId || {});
     return;
   }
 
@@ -232,10 +247,10 @@ function renderClientes(clients, weeks, demandas) {
     })
     .join("");
 
-  renderChecklistHoje(checklistHoje, diaHoje);
+  renderChecklistHoje(checklistHoje, diaHoje, colaboradoresPorId);
 }
 
-function renderChecklistHoje(lista, diaHoje) {
+function renderChecklistHoje(lista, diaHoje, colaboradoresPorId) {
   const el = document.getElementById("today-checklist");
 
   if (!diaHoje) {
@@ -262,6 +277,7 @@ function renderChecklistHoje(lista, diaHoje) {
           <div class="demanda-controls">
             ${item.hora_publicacao ? `<span class="demanda-meta">${item.hora_publicacao.slice(0, 5)}</span>` : ""}
             ${item.tipo_publicacao === "manual" ? '<span class="demanda-meta">Manual</span>' : ""}
+            ${item.responsavel_id && colaboradoresPorId[item.responsavel_id] ? `<span class="demanda-meta">${escapeHtml(colaboradoresPorId[item.responsavel_id])}</span>` : ""}
             <button class="btn btn-primary" data-marcar-feito="${item.id}" style="margin-left:auto;">Marcar como feito</button>
             <a class="btn btn-ghost" href="cliente.html?id=${cliente.id}">Abrir</a>
           </div>
@@ -299,9 +315,8 @@ function escapeHtml(str) {
 }
 
 async function init() {
-  const auth = await mountUserTag("user-tag");
-  if (!auth) return;
-  renderSaudacaoEData(auth.profile ? auth.profile.nome : "");
+  if (!montarTopbarAcoes("user-tag")) return;
+  renderSaudacaoEData();
   renderCalendario();
   await carregarDados();
 }
