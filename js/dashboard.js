@@ -336,7 +336,7 @@ document.getElementById("btn-salvar-cliente").addEventListener("click", async ()
     return;
   }
 
-  const { error } = await window.supabaseClient.from("clients").insert({ nome, cor });
+  const { error } = await window.supabaseClient.from("clients").insert({ nome, cor, ativo: true });
   if (error) {
     msg.textContent = "Erro ao salvar: " + error.message;
     msg.className = "form-msg error";

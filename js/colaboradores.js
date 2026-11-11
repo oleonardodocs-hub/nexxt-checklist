@@ -89,7 +89,7 @@ document.getElementById("btn-salvar-colaborador").addEventListener("click", asyn
     return;
   }
 
-  const { error } = await window.supabaseClient.from("colaboradores").insert({ nome, funcao: funcao || null });
+  const { error } = await window.supabaseClient.from("colaboradores").insert({ nome, funcao: funcao || null, ativo: true });
   if (error) {
     msg.textContent = "Erro ao salvar: " + error.message;
     msg.className = "form-msg error";
