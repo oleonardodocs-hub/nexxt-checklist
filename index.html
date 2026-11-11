@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Entrar · Gestão de Mídias Sociais</title>
+  <link rel="icon" type="image/png" href="assets/logo.png" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-card">
+      <img src="assets/logo.png" alt="" style="height:32px; margin-bottom:14px;" />
+      <h1>Gestão de Mídias Sociais</h1>
+      <p>Entre com seu e-mail e senha cadastrados.</p>
+
+      <form id="form-login">
+        <div class="field">
+          <label for="email">E-mail</label>
+          <input type="email" id="email" required autocomplete="email" />
+        </div>
+        <div class="field">
+          <label for="senha">Senha</label>
+          <input type="password" id="senha" required autocomplete="current-password" />
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;" id="btn-entrar">Entrar</button>
+        <p class="form-msg" id="msg"></p>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/vendor/supabase.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script>
+    document.getElementById("form-login").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = document.getElementById("email").value.trim();
+      const senha = document.getElementById("senha").value;
+      const msg = document.getElementById("msg");
+      const btn = document.getElementById("btn-entrar");
+      msg.textContent = "";
+      msg.className = "form-msg";
+      btn.disabled = true;
+      btn.textContent = "Entrando...";
+
+      const { error } = await window.supabaseClient.auth.signInWithPassword({ email, password: senha });
+
+      btn.disabled = false;
+      btn.textContent = "Entrar";
+
+      if (error) {
+        msg.textContent = "Não foi possível entrar: " + error.message;
+        msg.className = "form-msg error";
+        return;
+      }
+      window.location.href = "dashboard.html";
+    });
+
+    // se já estiver logado, pula direto pro dashboard
+    (async () => {
+      const { data: { session } } = await window.supabaseClient.auth.getSession();
+      if (session) window.location.href = "dashboard.html";
+    })();
+  </script>
+</body>
+</html>
